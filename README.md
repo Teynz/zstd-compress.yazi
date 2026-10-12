@@ -3,8 +3,7 @@
 Yazi-Plugin (≥ 26.9.1): Dateien/Ordner asynchron mit zstd komprimieren —
 als abbrechbare Yazi-Task, blockiert die UI nie.
 
-> **Status: WIP (v1.0.0-dev)** — funktioniert in den Tests unten, Installer und
-> einige Restprüfungen stehen noch aus (siehe „Offen“).
+**Version 1.0.0**
 
 ## Bedienung
 
@@ -29,11 +28,20 @@ als abbrechbare Yazi-Task, blockiert die UI nie.
   Modus `m` übersprungen
 - max. 2 Kompressionen gleichzeitig, davon max. 1 mit Stufe 8 (`-T4`)
 
-## Installation (manuell)
+## Installation
+
+Empfohlen: `install.sh` (sichert `keymap.toml`/`package.toml`, ersetzt alte
+`c z`-Bindings, installiert per `ya pkg`, prüft das Ergebnis, gibt den
+Rollback-Befehl aus):
 
 ```sh
-mkdir -p ~/.config/yazi/plugins/zstd-compress.yazi
-cp main.lua ~/.config/yazi/plugins/zstd-compress.yazi/
+curl -fsSL https://raw.githubusercontent.com/Teynz/zstd-compress.yazi/main/install.sh | bash
+```
+
+Manuell:
+
+```sh
+ya pkg add Teynz/zstd-compress
 ```
 
 `~/.config/yazi/keymap.toml`:
@@ -44,6 +52,8 @@ on   = [ "c", "z" ]
 run  = "plugin zstd-compress"
 desc = "mit zstd komprimieren"
 ```
+
+Update: `ya pkg upgrade Teynz/zstd-compress`
 
 Abhängigkeiten: `zstd`, GNU `tar`, `du`, `chmod`, `sh`; optional `setpriv`
 (util-linux), `gio` (glib2) oder `trash-put`.
@@ -65,13 +75,8 @@ Abhängigkeiten: `zstd`, GNU `tar`, `du`, `chmod`, `sh`; optional `setpriv`
 | Ziel liegt in ausgewähltem Ordner / doppelte Namen | abgelehnt |
 | Papierkorb nicht möglich | Archiv bleibt, Original bleibt, Warnung |
 | schreibgeschützter Ordner | Fehler, keine Änderung |
-
-## Offen
-
-- Test: tar Exit 1 (Datei ändert sich während des Packens)
-- Test: viele kleine Dateien (Dauer), großer Ordner (Fortschritt)
-- Installer (Kategorie C): Backup + Entfernen alter `c z`-Bindings in `keymap.toml`
-- Lua mit Tabs/Zeilen > 100 Zeichen → für Paste-Installer umformatieren
+| Datei ändert sich beim Packen (tar Exit 1) | Archiv ja, Original bleibt, Warnung |
+| `install.sh` (altes `c z`-Binding, 2. Lauf) | ersetzt, idempotent |
 
 `tests/` enthält die Sandbox-Hilfsskripte (tmux + `ya emit-to`), nicht für den
 Produktivbetrieb.
