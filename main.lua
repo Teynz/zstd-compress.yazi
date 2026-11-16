@@ -825,10 +825,11 @@ end
 --   how = "fd":  Leseposition der Eingabedatei (/proc/<pid>/fdinfo/0)
 --   how = "tar": letzte Checkpoint-Meldung von tar (stderr-Datei)
 --   how = "7z":  letzte Prozentangabe von 7-Zip (stderr-Datei)
-local function ticker(how, size, progress)
+-- `scale` rechnet gelesene Bytes auf `size` um (Test liest das kleinere Archiv).
+local function ticker(how, size, progress, scale)
 	local reported = 0
 	local function report(n)
-		n = math.min(math.floor(n), size)
+		n = math.min(math.floor(n * (scale or 1)), size)
 		if n > reported then
 			progress(n - reported)
 			reported = n
@@ -851,7 +852,7 @@ local function ticker(how, size, progress)
 			report(tonumber(n))
 		end
 	end
-	return tick, function() report(size) end
+	return tick, function() report(size / (scale or 1)) end
 end
 
 -- ══════════════════════════════ 4. Dateisystem ═════════════════════════════
@@ -1074,10 +1075,13 @@ local function pack(job, P, scope, progress)
 		s.nice = P.nice
 	end
 
+	-- mit Integritätstest zählt jeder Job doppelt: erst packen, dann prüfen (job.passes)
 	local tick, finish = ticker(how, job.size, progress)
+	local vfinish = function() end
 	local function failed(state, msg)
 		drop_tmp(tmp)
 		finish()
+		vfinish()
 		return { state = state, msg = msg }
 	end
 
@@ -1101,7 +1105,16 @@ local function pack(job, P, scope, progress)
 
 	if P.verify then
 		local arc = { fmt = fmt, tar = job.kind ~= "file" }
-		local vstate, vmsg = run(check_stages(arc, P.bins, files[1], P.password, #parts == 0 and fmt.typ or nil), scope)
+		local packed = fs.cha(Url(files[1]), false)
+		local vtick
+		if fmt.kind == "7z" then
+			vtick, vfinish = ticker("7z", job.size, progress)
+		elseif job.size > 0 and packed and packed.len > 0 then
+			vtick, vfinish = ticker("fd", job.size, progress, job.size / packed.len)
+		end
+		local vstages = check_stages(arc, P.bins, files[1], P.password, #parts == 0 and fmt.typ or nil)
+		local vstate, vmsg = run(vstages, scope, vtick)
+		vfinish()
 		if vstate == "cancel" then
 			return failed("cancel", "abgebrochen (während Test)")
 		elseif vstate ~= "ok" then
@@ -2030,7 +2043,7 @@ local function prepare_pack(st, T)
 		end
 		job.label = job.stem .. job.suffix
 		job.run = function(scope, progress) return pack(job, P, scope, progress) end
-		job.heavy, job.guard_mounts = P.heavy, true
+		job.heavy, job.guard_mounts, job.passes = P.heavy, true, P.verify and 2 or 1
 	end
 	local title = #jobs == 1 and string.format("%s: %s", summary(), jobs[1].label)
 		or string.format("%s: %d Archive", summary(), #jobs)
@@ -2138,7 +2151,7 @@ local function execute(self, task, scope, jobs, skipped, title)
 				job.size = job.size + s.len
 			end
 		end
-		workload = workload + job.size
+		workload = workload + job.size * (job.passes or 1)
 	end
 	if workload > 0 then
 		task:progress { workload = workload }
