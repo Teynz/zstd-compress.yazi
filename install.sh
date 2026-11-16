@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# install.sh — zstd-compress.yazi v1.0.0 (2026-10-12)
+# install.sh — zstd-compress.yazi v2.0.0 (2026-11-16)
 # MODUS: SCHREIBEND — ändert ~/.config/yazi (keymap.toml, package.toml, plugins/)
 # Kategorie C. Backups: ~/.config/yazi/backup-zstd-<TS>/ ; Rollback-Befehl am Ende.
 set -uo pipefail
@@ -26,7 +26,13 @@ done
 command -v gio >/dev/null || command -v trash-put >/dev/null \
   || fail "weder gio noch trash-put → pacman -S glib2 (oder trash-cli)"
 command -v setpriv >/dev/null \
-  || echo "[WARN] setpriv fehlt (util-linux): zstd überlebt dann ein Yazi-Ende"
+  || echo "[WARN] setpriv fehlt (util-linux): Werkzeuge überleben dann ein Yazi-Ende"
+# optionale Werkzeuge: fehlende Formate werden im Plugin einfach nicht angeboten
+command -v 7zz >/dev/null || command -v 7z >/dev/null \
+  || echo "[WARN] 7zz/7z fehlt (pacman -S 7zip): kein .7z/.zip, kein Entpacken von zip/rar"
+for t in xz gzip bzip2 lz4 brotli lzip sha256sum; do
+  command -v "$t" >/dev/null || echo "[INFO] $t fehlt: Format/Funktion nicht verfügbar"
+done
 [ -d "$CFG" ] || fail "$CFG fehlt"
 touch "$KM" "$PKG" || fail "$KM / $PKG nicht schreibbar"
 if grep -qE '^[[:space:]]*(prepend_keymap|append_keymap|keymap)[[:space:]]*=' "$KM"; then
@@ -45,18 +51,26 @@ python3 - "$KM" << 'PY'
 import re, sys
 p = sys.argv[1]
 src = open(p, encoding="utf-8").read()
-cz = re.compile(r'on\s*=\s*\[\s*["\']c["\']\s*,\s*["\']z["\']\s*\]')
+cz = re.compile(r'on\s*=\s*\[\s*["\']c["\']\s*,\s*["\'][zx]["\']\s*\]')
+ours = re.compile(r'run\s*=\s*["\']plugin zstd-compress')
 parts = re.split(r'(?m)^(?=\s*\[)', src)
 keep, removed = [], 0
 for part in parts:
-    if part.lstrip().startswith("[[") and cz.search(part):
+    # c z wird immer ersetzt; c x nur, wenn es bereits zu diesem Plugin gehört
+    mine = cz.search(part) and (ours.search(part) or '"z"' in cz.search(part).group(0) or "'z'" in cz.search(part).group(0))
+    if part.lstrip().startswith("[[") and mine:
         removed += 1
         print("  entfernt:", " ".join(part.split())[:90])
     else:
         keep.append(part)
 out = "".join(keep).rstrip("\n") + "\n"
 out += ('\n[[mgr.prepend_keymap]]\non   = [ "c", "z" ]\n'
-        'run  = "plugin zstd-compress"\ndesc = "mit zstd komprimieren"\n')
+        'run  = "plugin zstd-compress"\ndesc = "Komprimieren / Archiv erstellen"\n')
+if not cz.search(out.replace('[ "c", "z" ]', "")):
+    out += ('\n[[mgr.prepend_keymap]]\non   = [ "c", "x" ]\n'
+            'run  = "plugin zstd-compress extract"\ndesc = "Archiv entpacken / testen"\n')
+else:
+    print("  'c x' ist bereits anderweitig belegt – Entpacken über c z → X oder eigene Taste")
 import tomllib
 tomllib.loads(out)
 open(p, "w", encoding="utf-8").write(out)
@@ -81,6 +95,6 @@ chk "genau 1x 'c z'" \
   "[ \"\$(grep -cE 'on *= *\\[ *\"c\" *, *\"z\" *\\]' '$KM')\" = 1 ]"
 chk "keymap.toml gültig" "python3 -c 'import tomllib;tomllib.load(open(\"$KM\",\"rb\"))'"
 echo
-[ $ok = 1 ] && echo "FERTIG. Yazi neu starten, dann: c → z → 1-8." \
+[ $ok = 1 ] && echo "FERTIG. Yazi neu starten, dann: c z (packen) bzw. c x (entpacken)." \
             || echo "FEHLER oben prüfen."
 echo "Rollback: ya pkg delete $REPO; cp -a '$BK/keymap.toml' '$BK/package.toml' '$CFG/'"
