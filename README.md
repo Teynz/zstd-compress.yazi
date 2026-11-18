@@ -1,5 +1,13 @@
 # zstd-compress.yazi
 
+> [!WARNING]
+> **Dieses Repository ist vollständig KI-generiert.** Der gesamte Code, die
+> Tests, die Skripte und die Dokumentation wurden von Claude (Anthropic)
+> geschrieben. Der Eigentümer hat sie beauftragt und geprüft, aber nicht selbst
+> geschrieben. Ein Mensch hat den Quelltext nicht zeilenweise durchgesehen.
+> Nutzung auf eigenes Risiko; Original-Dateien werden nur im Papierkorb-Modus
+> verschont, Details unter „Sicherheit des Ablaufs“.
+
 Yazi-Plugin (≥ 26.9.1, Linux): Archive **packen, entpacken und testen** — komplett
 in der Yazi-Oberfläche, als abbrechbare Task mit Fortschritt im Task-Manager (`w`).
 
@@ -219,6 +227,19 @@ Von Hand zusätzlich geprüft: Fortschritt für Datei (Leseposition), Ordner
 (tar-Checkpoints) und 7-Zip (Prozent); endgültiges Löschen mit Rückfrage; eigene
 Presets speichern/löschen und `setup()`; Sonderzeichen, führendes `-`, `*`/`?`
 und Umlaute in Namen; Aufräumen nach hart beendetem Yazi.
+
+## TODO
+
+- [ ] **Archive als Ordner einhängen und ändern.** Anforderungen: stabil und
+  wartungsarm. Zu klären: eigene Lösung oder Anbindung an fuse-archive /
+  archivemount, Schreibzugriff ja/nein, Verhalten bei Abbruch.
+- [ ] **Formatwahl über Namenseingabe** (z. B. `x.tar.zst` wählt das Format).
+  Anforderungen sind noch zu klären (Zusammenspiel mit dem Formular,
+  Standardwerte, Verhalten bei unbekannter Endung).
+- [ ] **Task-Manager-Fix:** Die Fortschrittsanzeige im Task-Manager (`w`)
+  funktioniert nicht zuverlässig. Zu prüfen: PID/Stdin-Messung über
+  `/proc/<pid>/fdinfo/0`, verschluckte Fehler in `pcall`, stille Rückkehr bei
+  `acquire()`, Zählung von Warnungen als „failed“, Skalen bei tar und 7z.
 
 ## Nicht enthalten
 
